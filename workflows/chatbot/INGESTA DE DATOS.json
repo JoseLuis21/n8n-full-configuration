@@ -1,0 +1,286 @@
+{
+  "name": "BICOM - INGESTA DE DATOS",
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0c1f8078-f40b-4bd3-9b91-2a26164deed3",
+              "name": "phone_id",
+              "value": "={{ $json.contacts[0].wa_id || \"\"}}",
+              "type": "string"
+            },
+            {
+              "id": "4b5e7768-9e62-46f4-8525-3cb5777de7fa",
+              "name": "message",
+              "value": "={{ $json.messages[0].text.body || \"\" }}",
+              "type": "string"
+            },
+            {
+              "id": "56ab559a-518f-4c53-97f2-f528373e456d",
+              "name": "timestamp",
+              "value": "={{ $json.messages[0].timestamp}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -128,
+        -96
+      ],
+      "id": "04c6c01d-471b-4718-9d85-721c3a3cec4f",
+      "name": "NORMALIZAR CAMPOS"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {
+          "messageStatusUpdates": [
+            "sent"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        0
+      ],
+      "id": "7415442a-f540-43ff-a247-1818e0bba089",
+      "name": "TRIGGER WS BICOM",
+      "webhookId": "4de729c8-20ee-4050-9c2e-c71baeda8000",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "F0hrVrLGE3xllyq8",
+          "name": "Bicom WS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "278df72e-13d6-49c4-9c45-42687e0af8af",
+              "leftValue": "={{ $json.messages[0].type }}",
+              "rightValue": "text",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -352,
+        0
+      ],
+      "id": "cce0cdf2-43c3-4f36-846e-f0bd14448b81",
+      "name": "If1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        160
+      ],
+      "id": "457fa021-04af-48d2-a2af-74442c5ccd21",
+      "name": "FIN DEL FLUJO"
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "=chat:{{ $json.phone_id }}:messages",
+        "messageData": "={{ $json.message }}",
+        "tail": true
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        96,
+        -96
+      ],
+      "id": "f6a329d0-db56-4d93-bfd2-851d4c5d60fc",
+      "name": "GUARDAR LOS MENSAJES",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=chat:{{ $json.phone_id }}:messages",
+        "keyType": "list",
+        "expire": true,
+        "ttl": 50000
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        320,
+        -96
+      ],
+      "id": "a93c0b19-1939-40ce-a9c0-56cdff92d480",
+      "name": "SET TTL FOR MESSAGES",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sadd",
+        "set": "chat:pending",
+        "members": "={{ $json.phone_id }}"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        544,
+        -96
+      ],
+      "id": "118e0dac-3a4f-4ea8-863a-eb15870f9646",
+      "name": "AGREGAR NUMEROS A PENDIENTES DE ATENCION",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=chat:{{ $('TRIGGER WS BICOM').item.json.contacts[0].wa_id }}:last_msg_at",
+        "value": "={{ Math.floor(Date.now() / 1000) }}",
+        "keyType": "string"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        752,
+        -96
+      ],
+      "id": "b21c1036-5047-4a2b-9797-464b5713eb68",
+      "name": "AGREGAR UN DEBOUNCE",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "TRIGGER WS BICOM": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "NORMALIZAR CAMPOS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FIN DEL FLUJO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NORMALIZAR CAMPOS": {
+      "main": [
+        [
+          {
+            "node": "GUARDAR LOS MENSAJES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GUARDAR LOS MENSAJES": {
+      "main": [
+        [
+          {
+            "node": "SET TTL FOR MESSAGES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SET TTL FOR MESSAGES": {
+      "main": [
+        [
+          {
+            "node": "AGREGAR NUMEROS A PENDIENTES DE ATENCION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGREGAR NUMEROS A PENDIENTES DE ATENCION": {
+      "main": [
+        [
+          {
+            "node": "AGREGAR UN DEBOUNCE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fe91f5a0-b488-47c3-bcc8-1a69684dd232",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7e06cad9b61e4e407d2c058344bd6a43f07610a5c26ef2f30c4c57725958132e"
+  },
+  "id": "7KhXPjpB5Fs3tmkn",
+  "tags": []
+}

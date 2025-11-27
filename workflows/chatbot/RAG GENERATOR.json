@@ -1,0 +1,698 @@
+{
+  "name": "BICOM - RAG GENERATOR",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "=",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1Se8tqrTBjw175Z4L2wj8we0NUXUePe25",
+            "mode": "list",
+            "cachedResultName": "RAG BICOM",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1Se8tqrTBjw175Z4L2wj8we0NUXUePe25"
+          },
+          "includeTrashed": false
+        },
+        "options": {
+          "fields": [
+            "*"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -3008,
+        160
+      ],
+      "id": "2aa7fcfa-8e8c-484b-9693-b8036e2a85e5",
+      "name": "Buscar Archivos Y Directorios",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "FWVNl0OM8Iu9mOJ9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3e8281f0-7cbf-4b24-a7ba-870cb4eba40e",
+              "leftValue": "={{ $json.mimeType }}",
+              "rightValue": "application/vnd.google-apps.folder",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2784,
+        160
+      ],
+      "id": "05d03553-8659-42e2-96cc-37f5646aae83",
+      "name": "Es un archivo?"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "={{ $json.id }}",
+            "mode": "id"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -2560,
+        208
+      ],
+      "id": "049b8f4f-eaea-41c9-ad76-dff446a45853",
+      "name": "Recursividad para buscar archivos",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "FWVNl0OM8Iu9mOJ9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Extraer variables').item.json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1216,
+        112
+      ],
+      "id": "8e5b19cc-1e5a-4cdf-88ec-a6f5d284a016",
+      "name": "Descargar Archivos",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "FWVNl0OM8Iu9mOJ9",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "embeddingBatchSize": 300,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        -960,
+        112
+      ],
+      "id": "47f0359c-8cea-4917-83c3-0d7bd9e55577",
+      "name": "Base de datos - Creacion de embeddings",
+      "credentials": {
+        "postgres": {
+          "id": "axxzhplJadXwQrUJ",
+          "name": "Bicom Postgres account vector"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        -864,
+        336
+      ],
+      "id": "923c59f6-1232-4678-b507-fbbff8800980",
+      "name": "Lector de Archivos"
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 250,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        -784,
+        544
+      ],
+      "id": "6c0c5c9b-76f6-4b47-85a9-77047b970042",
+      "name": "Cortar Chunks de Nuestra data"
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -992,
+        336
+      ],
+      "id": "a3d8a53e-2c0f-42c9-8404-e1e57c582074",
+      "name": "Generador de Embeddings Global",
+      "credentials": {
+        "openAiApi": {
+          "id": "S2hGqxrmxT6f4nJM",
+          "name": "Bicom OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select count(*) as ingested from public.ingested_files\nwhere file_id = '{{ $json.id }}' and md5_checksum ='{{ $json.md5Checksum }}'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2560,
+        16
+      ],
+      "id": "cacc4cde-d1c2-403d-af4c-08bad0974541",
+      "name": "Validar Archivo Cargado",
+      "credentials": {
+        "postgres": {
+          "id": "axxzhplJadXwQrUJ",
+          "name": "Bicom Postgres account vector"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d78ac323-580a-4510-999d-7ff516f44e4d",
+              "leftValue": "={{ $json.ingested }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2336,
+        16
+      ],
+      "id": "6b01a0a6-1c9c-4722-b5d3-0a7d41b303b4",
+      "name": "Fue Cargado Anteriormente?"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -2112,
+        -80
+      ],
+      "id": "f8bad0b6-e390-48fb-ba3c-37ecbd3ea476",
+      "name": "Terminamos la ejecución"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "06ed85e4-73d9-495b-8513-5eab6dcfae9d",
+              "name": "id",
+              "value": "={{ $('Es un archivo?').item.json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "7898c3ef-102c-49e3-b2d0-65fb47adfe10",
+              "name": "md5Checksum",
+              "value": "={{ $('Es un archivo?').item.json.md5Checksum }}",
+              "type": "string"
+            },
+            {
+              "id": "5755e960-6ea7-42b7-b5e9-4b3976184973",
+              "name": "mimeType",
+              "value": "={{ $('Es un archivo?').item.json.mimeType }}",
+              "type": "string"
+            },
+            {
+              "id": "aecec16a-7406-4c80-b454-44b028abda28",
+              "name": "modifiedTime",
+              "value": "={{ $('Es un archivo?').item.json.modifiedTime }}",
+              "type": "string"
+            },
+            {
+              "id": "6b0962b0-523f-4b29-95d0-cebb2fae8607",
+              "name": "name",
+              "value": "={{ $('Es un archivo?').item.json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2112,
+        112
+      ],
+      "id": "1d2bfdc4-f722-40e2-baac-805594b80698",
+      "name": "Extraer variables"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "delete from n8n_vectors where file_id= '{{ $json.id }}';\ndelete from ingested_files where file_id= '{{ $json.id }}';",
+        "options": {
+          "queryBatching": "independently"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1888,
+        192
+      ],
+      "id": "d203c4c2-98e9-44f3-990b-2e45a769eae5",
+      "name": "Borrar Referencias",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "axxzhplJadXwQrUJ",
+          "name": "Bicom Postgres account vector"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1664,
+        112
+      ],
+      "id": "3aee0ce9-9fda-4d71-8891-25db9c24b67f",
+      "name": "Esperar eliminación",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "ingested_files",
+          "mode": "list",
+          "cachedResultName": "ingested_files"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "file_id": "={{ $('Extraer variables').item.json.id }}",
+            "name": "={{ $('Extraer variables').item.json.name }}",
+            "mime_type": "={{ $('Extraer variables').item.json.mimeType }}",
+            "md5_checksum": "={{ $('Extraer variables').item.json.md5Checksum }}",
+            "modified_time": "={{ $('Extraer variables').item.json.modifiedTime }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mime_type",
+              "displayName": "mime_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "md5_checksum",
+              "displayName": "md5_checksum",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "modified_time",
+              "displayName": "modified_time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "last_ingested",
+              "displayName": "last_ingested",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1440,
+        112
+      ],
+      "id": "ee002d0c-36b1-427e-bd6b-6852c8bd7506",
+      "name": "Insertar Documento Agregados",
+      "credentials": {
+        "postgres": {
+          "id": "axxzhplJadXwQrUJ",
+          "name": "Bicom Postgres account vector"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -3232,
+        160
+      ],
+      "id": "d09d9864-0199-4021-96bb-53ffc83698ea",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE n8n_vectors\nSET file_id = '{{ $('Extraer variables').item.json.id }}'\nWHERE metadata->'loc'->'lines' = '{{ $json.metadata.loc.lines.toJsonString() }}' and file_id is null",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -496,
+        112
+      ],
+      "id": "59261e3c-5636-4861-a0c3-742ae4477ee6",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "axxzhplJadXwQrUJ",
+          "name": "Bicom Postgres account vector"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        112
+      ],
+      "id": "37c69aac-88ce-40e1-af3e-922e39e75fd4",
+      "name": "Termino de la ejecución"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Buscar Archivos Y Directorios": {
+      "main": [
+        [
+          {
+            "node": "Es un archivo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Es un archivo?": {
+      "main": [
+        [
+          {
+            "node": "Validar Archivo Cargado",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recursividad para buscar archivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursividad para buscar archivos": {
+      "main": [
+        [
+          {
+            "node": "Es un archivo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descargar Archivos": {
+      "main": [
+        [
+          {
+            "node": "Base de datos - Creacion de embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Base de datos - Creacion de embeddings": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lector de Archivos": {
+      "ai_document": [
+        [
+          {
+            "node": "Base de datos - Creacion de embeddings",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cortar Chunks de Nuestra data": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Lector de Archivos",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generador de Embeddings Global": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Base de datos - Creacion de embeddings",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Archivo Cargado": {
+      "main": [
+        [
+          {
+            "node": "Fue Cargado Anteriormente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fue Cargado Anteriormente?": {
+      "main": [
+        [
+          {
+            "node": "Terminamos la ejecución",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extraer variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer variables": {
+      "main": [
+        [
+          {
+            "node": "Borrar Referencias",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Esperar eliminación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Borrar Referencias": {
+      "main": [
+        [
+          {
+            "node": "Esperar eliminación",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Esperar eliminación": {
+      "main": [
+        [
+          {
+            "node": "Insertar Documento Agregados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insertar Documento Agregados": {
+      "main": [
+        [
+          {
+            "node": "Descargar Archivos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Buscar Archivos Y Directorios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Termino de la ejecución",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "67e93f7a-3a2d-446a-9bf9-53706df2c1f9",
+  "meta": {
+    "instanceId": "7e06cad9b61e4e407d2c058344bd6a43f07610a5c26ef2f30c4c57725958132e"
+  },
+  "id": "ipqlC8lrffUmNAA7",
+  "tags": []
+}

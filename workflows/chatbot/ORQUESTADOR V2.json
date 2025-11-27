@@ -1,0 +1,1676 @@
+{
+  "name": "BICOM - ORQUESTADOR V2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1440,
+        -80
+      ],
+      "id": "65d87fab-d0b3-4e93-b938-4035cfe935ba",
+      "name": "INICIO DEL FLUJO"
+    },
+    {
+      "parameters": {
+        "operation": "eval",
+        "script": "return redis.call(\"SMEMBERS\", KEYS[1])",
+        "keys": "chat:pending"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        -1232,
+        -80
+      ],
+      "id": "b275b598-1756-427c-901a-e8c62ff696ab",
+      "name": "OBTENER LISTA DE NUMEROS POR ATENDER",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tomamos el array de teléfonos del primer item\nconst phones = items[0].json.result;\n\n// Creamos un nuevo item por cada teléfono\nconst newItems = phones.map(phone => {\n  return {\n    json: {\n      phone,\n    },\n  };\n});\n\nreturn newItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -976,
+        -80
+      ],
+      "id": "453759ea-b2aa-43d0-b6b7-59328123d7c7",
+      "name": "TRANSFORM PHONE TO MULTIPLE DATA"
+    },
+    {
+      "parameters": {
+        "operation": "llen",
+        "list": "=chat:{{ $('TRANSFORM PHONE TO MULTIPLE DATA').item.json.phone }}:messages"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -80
+      ],
+      "id": "3222ce0c-5056-419b-b2c7-cfe51d15bf22",
+      "name": "CONSULTAR SI EXISTEN MENSAJES PARA CADA NUMERO",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c9c4c223-4a79-4c19-aad9-1e37f252ffff",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        -80
+      ],
+      "id": "2dc4c35d-1ffc-43e7-a570-3644183f3f91",
+      "name": "SI EXISTEN MENSAJES"
+    },
+    {
+      "parameters": {
+        "operation": "srem",
+        "set": "chat:pending",
+        "members": "={{ $('TRANSFORM PHONE TO MULTIPLE DATA').item.json.phone }}"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        960,
+        96
+      ],
+      "id": "56c3cbc9-6a9f-4f5e-9bcb-8a72da9eaf7c",
+      "name": "ELIMINAR TELEFONO DE LA LISTA DE PENDIENTES",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "eval",
+        "script": "=return redis.call(\"LRANGE\", KEYS[1], 0, -1)",
+        "keys": "={{ $json.list }}"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        1072,
+        -240
+      ],
+      "id": "c36e56b4-89bb-4456-8f49-66d934e3784c",
+      "name": "OBTENER EL LISTADO DE MENSAJES AL MOMENTO",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = items[0];\n\n// Array de mensajes que vino del LRANGE\nconst messages = item.json.result;\n\n// Buffer: todos los mensajes unidos por salto de línea\nconst buffer = messages.slice().join('\\n');\n\n// n = cuántos mensajes procesaste\nconst n = messages.length;\n\nreturn [\n  {\n    json: {\n      // Si tienes más campos que quieras arrastrar, puedes ponerlos acá\n      buffer,\n      n,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        -240
+      ],
+      "id": "8945bf5f-48a1-4be4-a70a-29edb9f90fda",
+      "name": "Generar la conversacion del usuario"
+    },
+    {
+      "parameters": {
+        "operation": "llen",
+        "list": "=chat:{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}:messages"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        5568,
+        -464
+      ],
+      "id": "81b14ad2-d04c-48b4-ac45-4e1aa9d4eb7e",
+      "name": "CONTAR MENSAJES FALTANTES",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "eval",
+        "script": "=redis.call(\"LTRIM\", KEYS[1], {{ $('Generar la conversacion del usuario').item.json.n }}, -1)\nreturn 1",
+        "keys": "=chat:{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}:messages",
+        "args": "="
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        5360,
+        -464
+      ],
+      "id": "00dc2643-3212-4d2a-9f86-8496297176b8",
+      "name": "ELIMINAR MENSAJES PROCESADOS",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0403fcd8-d444-4761-b922-2cda56fa1a4d",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5824,
+        -464
+      ],
+      "id": "c8cd650e-c2ba-44ef-8678-695dd643dc6c",
+      "name": "SI NO HAY MENSAJES"
+    },
+    {
+      "parameters": {
+        "operation": "srem",
+        "set": "=chat:pending",
+        "members": "={{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        6128,
+        -592
+      ],
+      "id": "48cf1875-595a-4bc4-9fad-b95e9c032a02",
+      "name": "ELIMINAR NUMERO QUE YA FUE PROCESADO",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=### 🗣️ Mensajes del usuario (buffer):\n{{ $('Generar la conversacion del usuario').item.json.buffer }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=Alex debe ser un asesor comercial consultivo profesional, con energía positiva pero sin modismos. Aquí está el *prompt optimizado*:\n\n---\n\n*PROMPT MEJORADO para ALEX - Asesor Comercial Consultivo de Bicom:*\n\nEres Alex, el asesor comercial digital de Bicom. Tu misión es ser un consultor proactivo, simpático y energético que guía al cliente a través de una conversación estratégica para entender sus necesidades y ofrecer la mejor solución.\n\n## *Tu Personalidad y Enfoque:*\n- *Energético y positivo:* Transmite entusiasmo genuino por ayudar\n- *Consultivo:* Haz preguntas estratégicas para entender el negocio del cliente\n- *Profesional pero cercano:* Sin ser robótico, mantén un tono cálido y profesional\n- *Orientado a soluciones:* Enfócate en cómo Bicom puede resolver problemas específicos\n\n## *Tu Proceso de Conversación Consultiva:*\n\n### *FASE 1: PRESENTACIÓN Y RECONOCIMIENTO*\n1. Saluda con energía y preséntate brevemente\n2. *Pregunta clave:* \"¿Ya conoces las soluciones de Bicom o es primera vez que escuchas de nosotros?\"\n   \n   - *Si NO conoce Bicom:* \n     * Proporciona una presentación de alto valor:\n     * \"¡Excelente! Me encanta contarte sobre nosotros. Bicom es el líder en sistemas de punto de venta en Chile, con más de [X años] en el mercado. Somos la solución preferida de supermercados, ferreterías y farmacias que buscan optimizar sus operaciones y hacer crecer su negocio. Nuestro software no solo procesa ventas, sino que te ayuda a controlar inventarios, analizar tu negocio y tomar mejores decisiones.\"\n   \n   - *Si SÍ conoce Bicom:*\n     * \"¡Qué bueno! Entonces ya sabes que somos especialistas en hacer crecer negocios como el tuyo. Cuéntame, ¿qué te trae por aquí hoy?\"\n\n### *FASE 2: DESCUBRIMIENTO DEL NEGOCIO*\nHaz preguntas consultivas naturales (no todas de una vez):\n- \"Para poder ayudarte mejor, ¿me cuentas a qué se dedica tu negocio?\"\n- \"¿Qué rubro específico? ¿Supermercado, ferretería, farmacia, u otro tipo de comercio?\"\n- \"¿Cuántos puntos de venta o sucursales manejas actualmente?\"\n- \"¿Qué es lo más importante que buscas mejorar en tu negocio hoy?\"\n\n### *FASE 3: CONEXIÓN RUBRO-SOLUCIÓN*\nCuando identifiques el rubro, conecta inmediatamente con valor:\n\n- *Para Supermercados:* \"¡Perfecto! Somos la solución #1 para supermercados en Chile. Nuestros clientes del rubro han logrado reducir mermas hasta en 30% y aumentar la velocidad de atención en cajas en 40%.\"\n\n- *Para Ferreterías:* \"¡Excelente! Las ferreterías son uno de nuestros fuertes. Con miles de SKUs, sé lo complejo que puede ser el control de inventario. Nuestros clientes ferreteros han optimizado sus compras y reducido quiebres de stock significativamente.\"\n\n- *Para Farmacias:* \"¡Genial! Trabajamos con muchas farmacias exitosas. Entendemos perfectamente los requerimientos regulatorios y la importancia del control de medicamentos. Somos expertos en este vertical.\"\n\n### *FASE 4: PROPUESTA DE VALOR Y SIGUIENTE PASO*\nSolo cuando tengas claridad sobre:\n- Nombre de la empresa\n- Rubro específico  \n- Necesidad principal\n- Nombre del contacto\n\nEntonces propones: \"Con lo que me has contado, tengo claro que podemos ayudarte significativamente. Te propongo agendar una reunión breve de 30 minutos donde uno de nuestros especialistas en [rubro del cliente] te mostrará exactamente cómo Bicom puede resolver [necesidad específica mencionada]. ¿Te parece bien esta semana o prefieres la próxima?\"\n\n## *Reglas Críticas:*\n\n1. *NUNCA seas invasivo:* No pidas todos los datos de una vez. La conversación debe fluir naturalmente.\n\n2. *Datos esenciales para agendar:*\n   - RUT (solo si van a agendar)\n   - Nombre de la empresa\n   - Nombre del contacto\n   - Rubro específico\n   - Necesidad identificada\n\n3. *Si no tienes información específica:* Nunca digas \"no tengo esa información\". En su lugar: \"Esa es una excelente pregunta que requiere una respuesta más detallada. Justamente por eso me encantaría conectarte con nuestro especialista que podrá darte todos los detalles específicos para tu caso.\"\n\n4. *Solo habla de Bicom:* Si preguntan por temas externos, redirige amablemente: \"Me encantaría ayudarte, pero mi especialidad es mostrar cómo Bicom puede hacer crecer tu negocio. ¿Hay algo sobre nuestras soluciones que te gustaría saber?\"\n\n5. *Derivación estratégica:*\n   - *Ventas:* Cuando hay interés claro en adquirir\n   - *Postventa:* Solo clientes actuales con consultas de su servicio\n   - *Soporte técnico:* Nunca - redirige al canal correspondiente\n\n## *Instrucciones Técnicas:*\n- Utiliza {{ $json.prevState }} para mantener contexto de la conversación\n- El {{ $('Generar la conversacion del usuario').item.json.buffer }} contiene el último mensaje del usuario\n- Usa el contexto RAG para información de productos Bicom\n- *RESPONDE SOLO EN FORMATO JSON ESTRUCTURADO*, sin texto adicional\n\nRecuerda: Tu objetivo es calificar al lead a través de una conversación consultiva natural, identificar si Bicom es la solución correcta para él, y solo entonces agendar una reunión con el especialista adecuado.\n\n---\n\nEste prompt crea un Alex mucho más estratégico que:\n- Guía la conversación de forma consultiva\n- Identifica el nivel de conocimiento sobre Bicom\n- Descubre el rubro y necesidades específicas\n- Conecta las soluciones con los pain points del rubro\n- Solo agenda cuando tiene información cualificada\n- Mantiene un tono profesional, energético y consultivo"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        2240,
+        -288
+      ],
+      "id": "0628b36b-bcf1-40a3-912d-bb92ddf6230b",
+      "name": "AGENTE BICOM - AI"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5",
+          "mode": "list",
+          "cachedResultName": "gpt-5"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2032,
+        192
+      ],
+      "id": "af688904-cbf8-4afd-9b39-53b3d3d561b6",
+      "name": "MODELO DEL AGENTE",
+      "credentials": {
+        "openAiApi": {
+          "id": "S2hGqxrmxT6f4nJM",
+          "name": "Bicom OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Aqui tienes toda la información de bicom para responder los chats de los clientes, nunca respondas algo que no esta documentado",
+        "topK": 6
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        2416,
+        336
+      ],
+      "id": "043adce0-fbfb-4e0d-8af5-a88c95a20f20",
+      "name": "RESPUESTA AL AGENTE CON VECTORES"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        2224,
+        480
+      ],
+      "id": "044e79e6-52c8-4db5-868f-b385bff3dec4",
+      "name": "BASE DE DATOS - VECTORES GENERADOS",
+      "credentials": {
+        "postgres": {
+          "id": "axxzhplJadXwQrUJ",
+          "name": "Bicom Postgres account vector"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        2576,
+        576
+      ],
+      "id": "f149d698-9342-4bd3-8d91-78d207b06586",
+      "name": "MODELO PARA GENERAR LAS RESPUESTAS",
+      "credentials": {
+        "openAiApi": {
+          "id": "S2hGqxrmxT6f4nJM",
+          "name": "Bicom OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "=n8n-{{ $json.phone }}",
+        "contextWindowLength": 30
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        2256,
+        192
+      ],
+      "id": "79360ea8-bfc4-485e-8b6b-0331fecb729d",
+      "name": "MEMORIA DEL AGENTE - REDIS",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"nombre\": \"<nombre completo del usuario o 'desconocido' si no se sabe>\",\n  \"rut\": \"<RUT del usuario o '' si no se sabe o no aplica>\",\n  \"is_sale\": false,\n  \"is_postsale\": false,\n  \"motivo\": \"<resumen corto del motivo de contacto>\",\n  \"needs_more_info\": true,\n  \"info_faltante\": [\"nombre\", \"rut\"],\n  \"can_answer_directly\": false,\n  \"should_route_now\": false,\n  \"suggested_route\": \"none\",\n  \"respuesta\": \"<mensaje natural que enviaremos por WhatsApp al usuario>\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2656,
+        160
+      ],
+      "id": "191fd620-ff04-4e7e-9f5a-b017158c7f93",
+      "name": "FORMATO DE SALIDA"
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-large",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2080,
+        608
+      ],
+      "id": "ee3a970f-0f69-4a13-a104-eb404b14b613",
+      "name": "GENERADOR DE EMBEDDING",
+      "credentials": {
+        "openAiApi": {
+          "id": "S2hGqxrmxT6f4nJM",
+          "name": "Bicom OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "chat_state",
+        "key": "=chat:{{ $('Code in JavaScript').item.json.phone }}:state",
+        "options": {}
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        -240
+      ],
+      "id": "c6f91f82-fe0c-4804-964e-5f441590a442",
+      "name": "OBTENER EL ESTADO DEL USUARIO",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "23ef2eed-5a44-4138-a142-0e3c94bd04b9",
+              "leftValue": "={{ $json.chat_state }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1664,
+        -240
+      ],
+      "id": "a6a41231-e999-492b-83d6-350f8ca122fa",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) Lo que viene del AGENTE (último nodo): es la respuesta de la IA\n//    items[0].json = { nombre, rut, is_sale, ... , respuesta }\nconst llm = $input.first().json.output || {};\n\n// 2) Lo que generamos antes como estado previo (base)\n//    Viene del nodo \"Code in JavaScript\"\nconst prevWrapper = $('FORMATEAR DATOS INICIALES CUANDO NO HAY ESTADO').first().json;\n\nconst baseState = {\n  nombre: \"desconocido\",\n  rut: \"\",\n  is_sale: false,\n  is_support: false,\n  is_postsale: false,\n  motivo: \"\",\n  needs_more_info: true,\n  info_faltante: [],\n  can_answer_directly: false,\n  should_route_now: false,\n  suggested_route: \"none\",\n  respuesta: \"\"\n};\n\n// Si por alguna razón no hay prevState, usamos baseState\nconst prevState = prevWrapper && prevWrapper.prevState\n  ? prevWrapper.prevState\n  : baseState;\n\n// 3) Merge: lo que viene de la IA pisa al estado anterior\nconst merged = {\n  ...prevState,\n  ...llm,\n};\n\n// 4) Campos automáticos\nconst now = Date.now();\nmerged.updated_at = now;\nif (!merged.created_at) {\n  merged.created_at = now;\n}\n\n// 5) Output para los siguientes nodos\nreturn [\n  {\n    json: {\n      phone: prevWrapper.phone,        // viene del primer code\n      state: merged,                   // esto lo guardas en Redis\n      respuesta: merged.respuesta,     // esto lo mandas por WhatsApp\n      is_sale: merged.is_sale,\n      is_support: merged.is_support,\n      is_postsale: merged.is_postsale,\n      should_route_now: merged.should_route_now,\n      suggested_route: merged.suggested_route,\n      needs_more_info: merged.needs_more_info,\n      info_faltante: merged.info_faltante\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2592,
+        -288
+      ],
+      "id": "fab08dac-8c93-4dd7-b518-ff53fa0d9bc6",
+      "name": "MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst phone = $('TRANSFORM PHONE TO MULTIPLE DATA').first().json.phone \nreturn [{\n  phone,\n  prevState: {\n    nombre: \"desconocido\",\n    rut: \"\",\n    is_sale: false,\n    is_postsale: false,\n    motivo: \"\",\n    needs_more_info: true,\n    info_faltante: [],\n    can_answer_directly: false,\n    should_route_now: false,\n    suggested_route: \"none\",\n    respuesta: \"\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        -128
+      ],
+      "id": "8d470c7d-c636-4a49-bc88-69d01f3db47f",
+      "name": "FORMATEAR DATOS INICIALES CUANDO NO HAY ESTADO"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=877177362138319",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "textBody": "={{ $json.state.respuesta }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3264,
+        -544
+      ],
+      "id": "d1e860e1-8e35-48d6-b743-f6e5cbba8989",
+      "name": "Enviar Mensaje - NeedMoreInfo",
+      "webhookId": "71c38fd0-3948-4c91-b204-da7ae321686b",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "o2vbOPeXMX2o8HE4",
+          "name": "Bicom WS CLOUD API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.needs_more_info }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    },
+                    "id": "80947d5d-dc12-4952-81e0-a8c50f1802b2"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b35e5658-bbbe-4765-baec-3d1f8f977a12",
+                    "leftValue": "={{ $json.is_sale }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "6ea6e65e-c2da-423d-ba72-76b65a3ff314",
+                    "leftValue": "={{ $json.is_postsale }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "82b9fb87-995c-4579-8769-255e0870e54d",
+                    "leftValue": "={{ $json.state.can_answer_directly }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        2800,
+        -288
+      ],
+      "id": "949df096-76e1-4f89-bef9-f7445a6b7919",
+      "name": "Flujo de mensajes"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=877177362138319",
+        "recipientPhoneNumber": "={{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}",
+        "textBody": "=✅ Derivación exitosa  Gracias por tu interés en Bicom 🙌 Te derivaremos con el equipo de Ventas, quienes podrán ayudarte con toda la información comercial y resolver tus dudas sobre planes o contrataciones.  En unos momentos uno de nuestros ejecutivos se comunicará contigo ✉️",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3248,
+        -288
+      ],
+      "id": "d41f059c-67e1-44be-9045-94d80179b2f2",
+      "name": "Derivado a Ventas",
+      "webhookId": "8eaed6d1-74ec-4843-880c-a4dcd99a272b",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "o2vbOPeXMX2o8HE4",
+          "name": "Bicom WS CLOUD API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=877177362138319",
+        "recipientPhoneNumber": "={{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}",
+        "textBody": "=✅ Solicitud recibida  Gracias por comunicarte con Bicom 🙌 Te derivaremos con el equipo de Post Venta, quienes podrán ayudarte con gestiones posteriores a tu contratación, mejoras de servicio o cambios solicitados.  En unos momentos un ejecutivo del área se pondrá en contacto contigo ✉️",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        3248,
+        192
+      ],
+      "id": "3970849b-2a5f-46e4-8b66-2ec9e6b85633",
+      "name": "Derivado a post Venta",
+      "webhookId": "c0816467-dc38-456c-8a2b-a45c1eeb222e",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "o2vbOPeXMX2o8HE4",
+          "name": "Bicom WS CLOUD API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "eval",
+        "script": "return redis.call('SET', KEYS[1], '1', 'NX', 'EX', 500)",
+        "keys": "=chat:{{ $('TRANSFORM PHONE TO MULTIPLE DATA').item.json.phone }}:lock"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -80
+      ],
+      "id": "5ef2d406-a3ec-494e-89c7-50e7e4ff7382",
+      "name": "Bloquear para no responder 2 veces seguidas lo mismo",
+      "alwaysOutputData": false,
+      "notesInFlow": false,
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        384,
+        272
+      ],
+      "id": "cd3fc9a5-bffb-4cd4-b93a-3af3d1770dfb",
+      "name": "Se termina el flujo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "97b2bca0-8535-4e47-bfcb-fb6c60588d5d",
+              "leftValue": "={{ $json.result }}",
+              "rightValue": "OK",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        128,
+        -80
+      ],
+      "id": "998d3b07-7032-4597-958f-21ea2a20bafb",
+      "name": "YA ESTA SIENDO PROCESADO?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const idx = $itemIndex;\nconst phone = $('TRANSFORM PHONE TO MULTIPLE DATA').all()[idx].json.phone;\n\nreturn [{\n  json: {\n    phone,\n    ...$json   // conserva lo que devolvió Redis\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        848,
+        -240
+      ],
+      "id": "54c7f9a6-d50c-4f59-b8c3-11f9363b8c3a",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "=n8n-{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        3536,
+        -288
+      ],
+      "id": "74b722dd-e866-4a74-af50-7815895029e1",
+      "name": "OBTENER CONVERSACION",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all(); // todos los items de entrada\nconst messages = [];\n\nfor (const item of all) {\n  const raw = Array.isArray(item.json.propertyName) ? item.json.propertyName : [];\n\n  for (const s of raw) {\n    try {\n      const parsed = JSON.parse(s);\n      const type = parsed?.type ?? '';\n      let msg = parsed?.data?.content ?? '';\n\n      // si es mensaje de IA, parsear JSON interno\n      if ((type === 'ai') && typeof msg === 'string' && msg.startsWith('{')) {\n        try {\n          const inner = JSON.parse(msg);\n          msg = inner?.output?.message ?? msg;\n        } catch {}\n      }\n\n      // Solo guardar mensajes de tipo human o ai\n      if (type === 'ai' || type === 'human') {\n        // 🧹 Limpieza avanzada del mensaje\n        msg = String(msg)\n          .replace(/<[^>]+>/g, '')             // elimina etiquetas HTML\n          .replace(/[\\n\\r\\t]+/g, ' ')          // reemplaza saltos, tabs\n          .replace(/&[a-z]+;/gi, ' ')          // elimina entidades HTML\n          .replace(/[^\\wÀ-ÿ.,!¡¿?'\"%()+-]/g, ' ') // limpia símbolos raros\n          .replace(/\\s{2,}/g, ' ')             // colapsa espacios múltiples\n          .trim();\n\n        if (msg) messages.push(msg);\n      }\n    } catch {}\n  }\n}\n\n// salida: array de mensajes + texto concatenado\nreturn [{\n  json: {\n    messages,\n    conversation: messages.join(' ')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3808,
+        -288
+      ],
+      "id": "f5a9c414-7ef9-4761-a5d2-9e83b98d9314",
+      "name": "GENERAR LA CONVERSACIÓN DEL USUARIO",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Devuelve solo el resumen de la conversacion, nada mas",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.conversation }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        4064,
+        -288
+      ],
+      "id": "2a37d004-abaf-4413-9db7-a36dc4ce8ada",
+      "name": "RESUMIR LA CONVERSACION DEL USUARIO",
+      "credentials": {
+        "openAiApi": {
+          "id": "S2hGqxrmxT6f4nJM",
+          "name": "Bicom OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "key": "=n8n-{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        3536,
+        192
+      ],
+      "id": "45933b2f-b555-4571-a14b-4beec6b9343c",
+      "name": "OBTENER CONVERSACION2",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all(); // todos los items de entrada\nconst messages = [];\n\nfor (const item of all) {\n  const raw = Array.isArray(item.json.propertyName) ? item.json.propertyName : [];\n\n  for (const s of raw) {\n    try {\n      const parsed = JSON.parse(s);\n      const type = parsed?.type ?? '';\n      let msg = parsed?.data?.content ?? '';\n\n      // si es mensaje de IA, parsear JSON interno\n      if ((type === 'ai') && typeof msg === 'string' && msg.startsWith('{')) {\n        try {\n          const inner = JSON.parse(msg);\n          msg = inner?.output?.message ?? msg;\n        } catch {}\n      }\n\n      // Solo guardar mensajes de tipo human o ai\n      if (type === 'ai' || type === 'human') {\n        // 🧹 Limpieza avanzada del mensaje\n        msg = String(msg)\n          .replace(/<[^>]+>/g, '')             // elimina etiquetas HTML\n          .replace(/[\\n\\r\\t]+/g, ' ')          // reemplaza saltos, tabs\n          .replace(/&[a-z]+;/gi, ' ')          // elimina entidades HTML\n          .replace(/[^\\wÀ-ÿ.,!¡¿?'\"%()+-]/g, ' ') // limpia símbolos raros\n          .replace(/\\s{2,}/g, ' ')             // colapsa espacios múltiples\n          .trim();\n\n        if (msg) messages.push(msg);\n      }\n    } catch {}\n  }\n}\n\n// salida: array de mensajes + texto concatenado\nreturn [{\n  json: {\n    messages,\n    conversation: messages.join(' ')\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3808,
+        192
+      ],
+      "id": "6585b6ab-6898-489c-9aff-e3160ffce190",
+      "name": "GENERAR LA CONVERSACIÓN DEL USUARIO2",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "Devuelve solo el resumen de la conversacion, nada mas",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.conversation }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        4064,
+        192
+      ],
+      "id": "2870ef56-7ee8-4134-8789-9ceb9eb1a849",
+      "name": "RESUMIR LA CONVERSACION DEL USUARIO2",
+      "credentials": {
+        "openAiApi": {
+          "id": "S2hGqxrmxT6f4nJM",
+          "name": "Bicom OpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "ticket",
+        "pipelineId": "0",
+        "stageId": "1194145859",
+        "ticketName": "Nuevo Lead",
+        "additionalFields": {
+          "description": "={{ $json.message.content }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        4464,
+        -288
+      ],
+      "id": "28982434-3904-4579-83e1-9c37f818d365",
+      "name": "CREAR TICKET PARA VENTAS",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "2Ra9LFfme8Wg1Whf",
+          "name": "Hubspot Bicom"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "appToken",
+        "resource": "ticket",
+        "pipelineId": "0",
+        "stageId": "1197426216",
+        "ticketName": "Nueva Post Venta",
+        "additionalFields": {
+          "description": "={{ $json.message.content }}"
+        }
+      },
+      "type": "n8n-nodes-base.hubspot",
+      "typeVersion": 2.2,
+      "position": [
+        4464,
+        192
+      ],
+      "id": "455bd59f-cd74-4747-a397-def7f1fc4ea2",
+      "name": "CREAR TICKET POSTVENTA",
+      "credentials": {
+        "hubspotAppToken": {
+          "id": "2Ra9LFfme8Wg1Whf",
+          "name": "Hubspot Bicom"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=877177362138319",
+        "recipientPhoneNumber": "=56992588962",
+        "textBody": "=📥 Nueva derivación - Ventas\n\nNombre: {{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.state.nombre }}\n\nRut: {{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.state.rut }}\n\nResumen: {{ $('RESUMIR LA CONVERSACION DEL USUARIO').item.json.message.content }}\n\nEnlace directo: https://wa.me/{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        4736,
+        -288
+      ],
+      "id": "61ce15ca-261c-4648-8e22-998d6c1b5371",
+      "name": "Derivado a Ventas Ejecutivo",
+      "webhookId": "4204bd6e-382f-461f-ac51-2a013920080c",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "o2vbOPeXMX2o8HE4",
+          "name": "Bicom WS CLOUD API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=877177362138319",
+        "recipientPhoneNumber": "=56992588962",
+        "textBody": "=📥 Nueva derivación - Post Venta\n\nNombre: {{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.state.nombre }}\n\nRut: {{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.state.rut }}\n\nResumen: {{ $('RESUMIR LA CONVERSACION DEL USUARIO2').item.json.message.content }}\n\nEnlace directo: https://wa.me/{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        4736,
+        192
+      ],
+      "id": "528c4b79-cee3-4a86-9019-0b71cf2ec9f6",
+      "name": "Derivado a post venta",
+      "webhookId": "56997cfc-c41f-4942-9857-2aff2afe55a0",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "o2vbOPeXMX2o8HE4",
+          "name": "Bicom WS CLOUD API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "=n8n-{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        5344,
+        192
+      ],
+      "id": "ae31a0e3-bd59-4861-9278-b3cd2eaa9c35",
+      "name": "ELIMINAR CONVERSACION DEL AGENTE",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "=chat:{{ $('MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA').item.json.phone }}:lock"
+      },
+      "type": "@vicenterusso/n8n-nodes-redis-enhanced.redisEnhanced",
+      "typeVersion": 1,
+      "position": [
+        6416,
+        -352
+      ],
+      "id": "95e420e6-d7c8-4d0f-ae26-43a2228da9fa",
+      "name": "DESBLOQUEAR CONVERSACION",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "last_message",
+        "key": "=chat:{{ $json.phone }}:last_msg_at",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -768,
+        -80
+      ],
+      "id": "bbc68d91-7386-4d1e-bd73-433f27f45d74",
+      "name": "Get LastMessage Debounce",
+      "credentials": {
+        "redis": {
+          "id": "FxwoCXnNbTSLYmfw",
+          "name": "Bicom Redis"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        208
+      ],
+      "id": "9d28c03a-8a36-4706-b2b7-96a8f45792e9",
+      "name": "Fin del flujo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d37a88cd-7847-489c-9025-3efb1492cf62",
+              "leftValue": "={{ $json.last_message }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -320,
+        -80
+      ],
+      "id": "aac8d8f5-cd53-402f-9c4f-634f12014610",
+      "name": "VALIDAR SI PASO EL TIEMPO DEL DEBOUNCE"
+    },
+    {
+      "parameters": {
+        "jsCode": "const secsWindow = 7; // ventana de espera: 7 segundos sin mensajes\n\nconst lastStr = $input.first().json.last_message || \"0\";\nconst last = parseInt(lastStr, 10);\nconst now = Math.floor(Date.now() / 1000);\nconst diff = now - last;\n\n// Si todavía está \"caliente\" (el usuario sigue escribiendo), NO procesamos nada\nif (diff < secsWindow) {\n  // devolver [] hace que este item se “muera” aquí y no siga el flujo\n  return [];\n}\n\n// Si ya pasó la ventana, dejamos pasar el item al resto del flujo\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -544,
+        -80
+      ],
+      "id": "63004efb-75c1-412a-9c8f-e885fe8459e4",
+      "name": "Validar Tiempo de espera del debounce"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "INICIO DEL FLUJO": {
+      "main": [
+        [
+          {
+            "node": "OBTENER LISTA DE NUMEROS POR ATENDER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OBTENER LISTA DE NUMEROS POR ATENDER": {
+      "main": [
+        [
+          {
+            "node": "TRANSFORM PHONE TO MULTIPLE DATA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRANSFORM PHONE TO MULTIPLE DATA": {
+      "main": [
+        [
+          {
+            "node": "Get LastMessage Debounce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONSULTAR SI EXISTEN MENSAJES PARA CADA NUMERO": {
+      "main": [
+        [
+          {
+            "node": "SI EXISTEN MENSAJES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SI EXISTEN MENSAJES": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "ELIMINAR TELEFONO DE LA LISTA DE PENDIENTES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OBTENER EL LISTADO DE MENSAJES AL MOMENTO": {
+      "main": [
+        [
+          {
+            "node": "Generar la conversacion del usuario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar la conversacion del usuario": {
+      "main": [
+        [
+          {
+            "node": "OBTENER EL ESTADO DEL USUARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ELIMINAR MENSAJES PROCESADOS": {
+      "main": [
+        [
+          {
+            "node": "CONTAR MENSAJES FALTANTES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CONTAR MENSAJES FALTANTES": {
+      "main": [
+        [
+          {
+            "node": "SI NO HAY MENSAJES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SI NO HAY MENSAJES": {
+      "main": [
+        [
+          {
+            "node": "ELIMINAR NUMERO QUE YA FUE PROCESADO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DESBLOQUEAR CONVERSACION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MODELO DEL AGENTE": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AGENTE BICOM - AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESPUESTA AL AGENTE CON VECTORES": {
+      "ai_tool": [
+        [
+          {
+            "node": "AGENTE BICOM - AI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BASE DE DATOS - VECTORES GENERADOS": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "RESPUESTA AL AGENTE CON VECTORES",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MODELO PARA GENERAR LAS RESPUESTAS": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "RESPUESTA AL AGENTE CON VECTORES",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MEMORIA DEL AGENTE - REDIS": {
+      "ai_memory": [
+        [
+          {
+            "node": "AGENTE BICOM - AI",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FORMATO DE SALIDA": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AGENTE BICOM - AI",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GENERADOR DE EMBEDDING": {
+      "ai_embedding": [
+        [
+          {
+            "node": "BASE DE DATOS - VECTORES GENERADOS",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OBTENER EL ESTADO DEL USUARIO": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [],
+        [
+          {
+            "node": "FORMATEAR DATOS INICIALES CUANDO NO HAY ESTADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGENTE BICOM - AI": {
+      "main": [
+        [
+          {
+            "node": "MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FORMATEAR DATOS INICIALES CUANDO NO HAY ESTADO": {
+      "main": [
+        [
+          {
+            "node": "AGENTE BICOM - AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE DE LOS DATOS INICIALES CON LOS NUEVOS DE LA IA": {
+      "main": [
+        [
+          {
+            "node": "Flujo de mensajes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flujo de mensajes": {
+      "main": [
+        [
+          {
+            "node": "Enviar Mensaje - NeedMoreInfo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Derivado a Ventas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Derivado a post Venta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar Mensaje - NeedMoreInfo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Mensaje - NeedMoreInfo": {
+      "main": [
+        [
+          {
+            "node": "ELIMINAR MENSAJES PROCESADOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derivado a Ventas": {
+      "main": [
+        [
+          {
+            "node": "OBTENER CONVERSACION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derivado a post Venta": {
+      "main": [
+        [
+          {
+            "node": "OBTENER CONVERSACION2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bloquear para no responder 2 veces seguidas lo mismo": {
+      "main": [
+        [
+          {
+            "node": "YA ESTA SIENDO PROCESADO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YA ESTA SIENDO PROCESADO?": {
+      "main": [
+        [
+          {
+            "node": "CONSULTAR SI EXISTEN MENSAJES PARA CADA NUMERO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Se termina el flujo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "OBTENER EL LISTADO DE MENSAJES AL MOMENTO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OBTENER CONVERSACION": {
+      "main": [
+        [
+          {
+            "node": "GENERAR LA CONVERSACIÓN DEL USUARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GENERAR LA CONVERSACIÓN DEL USUARIO": {
+      "main": [
+        [
+          {
+            "node": "RESUMIR LA CONVERSACION DEL USUARIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OBTENER CONVERSACION2": {
+      "main": [
+        [
+          {
+            "node": "GENERAR LA CONVERSACIÓN DEL USUARIO2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GENERAR LA CONVERSACIÓN DEL USUARIO2": {
+      "main": [
+        [
+          {
+            "node": "RESUMIR LA CONVERSACION DEL USUARIO2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESUMIR LA CONVERSACION DEL USUARIO": {
+      "main": [
+        [
+          {
+            "node": "CREAR TICKET PARA VENTAS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESUMIR LA CONVERSACION DEL USUARIO2": {
+      "main": [
+        [
+          {
+            "node": "CREAR TICKET POSTVENTA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CREAR TICKET PARA VENTAS": {
+      "main": [
+        [
+          {
+            "node": "Derivado a Ventas Ejecutivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CREAR TICKET POSTVENTA": {
+      "main": [
+        [
+          {
+            "node": "Derivado a post venta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derivado a Ventas Ejecutivo": {
+      "main": [
+        [
+          {
+            "node": "ELIMINAR MENSAJES PROCESADOS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ELIMINAR CONVERSACION DEL AGENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Derivado a post venta": {
+      "main": [
+        [
+          {
+            "node": "ELIMINAR MENSAJES PROCESADOS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "ELIMINAR CONVERSACION DEL AGENTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ELIMINAR NUMERO QUE YA FUE PROCESADO": {
+      "main": [
+        [
+          {
+            "node": "DESBLOQUEAR CONVERSACION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get LastMessage Debounce": {
+      "main": [
+        [
+          {
+            "node": "Validar Tiempo de espera del debounce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDAR SI PASO EL TIEMPO DEL DEBOUNCE": {
+      "main": [
+        [
+          {
+            "node": "Bloquear para no responder 2 veces seguidas lo mismo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fin del flujo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Tiempo de espera del debounce": {
+      "main": [
+        [
+          {
+            "node": "VALIDAR SI PASO EL TIEMPO DEL DEBOUNCE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b8ca2fda-b5a6-4c71-a098-8d8f98fd84e2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7e06cad9b61e4e407d2c058344bd6a43f07610a5c26ef2f30c4c57725958132e"
+  },
+  "id": "2kPp0yr4b6JZHQ8C",
+  "tags": []
+}
